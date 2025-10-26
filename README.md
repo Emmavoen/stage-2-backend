@@ -1,164 +1,180 @@
-# HNG Stage 1: String Analyzer Service
+Country Currency & GDP API
 
-This is a RESTful API service built for the HNG Internship (Stage 1). It analyzes strings, computes various properties, and stores the results in a MongoDB database.
+This is a RESTful API that fetches country and currency data from external sources, calculates estimated GDP, and caches it in a MySQL database. It provides full CRUD operations and generates a dynamic summary image.
 
-## Features
+This project is built with Node.js, TypeScript, Express, Sequelize, and MySQL.
 
-* Analyzes strings for 6 different properties.
-* Stores and retrieves analysis results.
-* Provides advanced filtering based on computed properties.
-* Offers a natural language endpoint for simple queries.
+Features
 
-## Tech Stack
+Fetches data from restcountries.com and open.er-api.com.
 
-* **Server:** Node.js, Express.js
-* **Language:** TypeScript
-* **Database:** MongoDB (with Mongoose)
-* **Environment:** dotenv
+Caches all data in a MySQL database.
 
----
+Calculates estimated_gdp for each country with a random multiplier.
 
-## Setup and Installation
+Generates a PNG summary image on refresh using sharp.
 
-Follow these steps to get the project running on your local machine.
+Provides robust error handling and standardized JSON responses.
 
-1.  **Clone the repository:**
-    ```bash
-    git clone [https://github.com/your-username/your-repo-name.git](https://github.com/your-username/your-repo-name.git)
-    ```
+Environment Variables
 
-2.  **Navigate to the project directory:**
-    ```bash
-    cd your-repo-name
-    ```
+Create a .env file in the root of the project.
 
-3.  **Install dependencies:**
-    (This installs all dependencies listed in `package.json`)
-    ```bash
-    npm install
-    ```
+# Port for the server
+PORT=8080
 
-4.  **Create an environment file:**
-    Copy the example environment file to a new `.env` file.
-    ```bash
-    cp .env.example .env
-    ```
+# Your MySQL connection string (e.g., from Railway)
+# Format: mysql://USER:PASSWORD@HOST:PORT/DATABASE
+DATABASE_URL="mysql://root:my_pass@my_host.railway.app:1234/railway"
 
-5.  **Update Environment Variables:**
-    Open the `.env` file and add your configuration details. (See below)
+# External API URLs
+COUNTRIES_API_URL=[https://restcountries.com/v2/all?fields=name,capital,region,population,flag,currencies](https://restcountries.com/v2/all?fields=name,capital,region,population,flag,currencies)
+RATES_API_URL=[https://open.er-api.com/v6/latest/USD](https://open.er-api.com/v6/latest/USD)
 
----
 
-## Environment Variables
+Setup & Installation
 
-This project requires the following environment variables to be set in your `.env` file:
+Clone the repository:
 
-* `PORT`: The port the server will run on (e.g., `8080`).
-* `DATABASE_URL`: Your full MongoDB connection string.
-    * *Example:* `mongodb://localhost:27017/hng-string-db` or a remote Atlas string.
+git clone [https://github.com/your-username/country-api.git](https://github.com/your-username/country-api.git)
+cd country-api
 
----
 
-## Running the Application
+Install dependencies (using Bun):
 
-You can run the server in development or production mode.
+bun install
 
-### Development Mode
 
-This command uses `nodemon` and `ts-node` to run the server. It will automatically restart when you save changes to a file.
+Set up the database:
 
-```bash
-npm run dev
-```
+This project is designed to connect to a cloud-hosted MySQL database (like on Railway).
 
-### Production Mode
+Create a new MySQL service on your hosting provider.
 
-This command first builds the TypeScript code into plain JavaScript in the `/dist` folder, and then runs the built code.
+Get the public connection URL (e.g., MYSQL_PUBLIC_URL) and paste it as the DATABASE_URL in your .env file.
 
-```bash
-# 1. Build the project
-npm run build
+Run the server (Development):
 
-# 2. Start the server
-npm run start
-```
+bun run dev
 
-The server will be running at `http://localhost:PORT`.
 
----
+The server will start on http://localhost:8080 (or your PORT) and auto-restart on file changes.
 
-## API Documentation
+Build and Run (Production):
 
-You can test the endpoints using an API client like Postman or Insomnia.
+bun run build   # Compiles TypeScript to ./dist
+bun start       # Runs the compiled JavaScript
 
-### 1. Create/Analyze String
 
-* **Endpoint:** `POST /strings`
-* **Description:** Analyzes a new string and stores its properties.
-* **Request Body:**
-    ```json
-    {
-      "value": "A man, a plan, a canal: Panama"
-    }
-    ```
-* **Success Response (201 Created):**
-    Returns the full analysis object.
-* **Error Responses:**
-    * `400 Bad Request`: If the "value" field is missing.
-    * `422 Unprocessable Entity`: If "value" is not a string.
-    * `409 Conflict`: If a string with the same value (and hash) already exists.
+API Endpoints
 
-### 2. Get Specific String
+All endpoints are prefixed with /api.
 
-* **Endpoint:** `GET /strings/:string_value`
-* **Description:** Retrieves the analysis for a specific string.
-* **Example URL:** `GET /strings/racecar`
-* **Success Response (200 OK):**
-    Returns the stored analysis object.
-* **Error Responses:**
-    * `404 Not Found`: If the string does not exist in the system.
+POST /countries/refresh
 
-### 3. Get All Strings (with Filtering)
+Fetches fresh data from all external APIs, recalculates all GDPs, and updates the database cache. This also regenerates the summary.png image.
 
-* **Endpoint:** `GET /strings`
-* **Description:** Returns a list of all string analyses, with optional query parameters for filtering.
-* **Query Parameters:**
-    * `is_palindrome` (boolean): e.g., `?is_palindrome=true`
-    * `min_length` (integer): e.g., `?min_length=10`
-    * `max_length` (integer): e.g., `?max_length=50`
-    * `word_count` (integer): e.g., `?word_count=2`
-    * `contains_character` (string): e.g., `?contains_character=z`
-* **Example URL:** `GET /strings?is_palindrome=true&min_length=3`
-* **Success Response (200 OK):**
-    Returns an object containing the `data` array, `count`, and `filters_applied`.
-* **Error Responses:**
-    * `400 Bad Request`: If any query parameter has an invalid type.
+Success Response (200):
 
-### 4. Natural Language Filtering
+{
+  "message": "Cache refreshed successfully",
+  "total_countries": 250,
+  "last_refreshed_at": "2025-10-26T15:30:00.000Z"
+}
 
-* **Endpoint:** `GET /strings/filter-by-natural-language`
-* **Description:** Parses a natural language query to apply filters.
-* **Query Parameter:**
-    * `query` (string): The natural language query.
-* **Example URL:** `GET /strings/filter-by-natural-language?query=all single word palindromic strings`
-* **Success Response (200 OK):**
-    Returns an object with the `data`, `count`, and the `interpreted_query`.
-* **Error Responses:**
-    * `400 Bad Request`: If the "query" parameter is missing.
-    * `422 Unprocessable Entity`: If the query results in conflicting filters.
 
-### 5. Delete String
+Error Response (503):
 
-* **Endpoint:** `DELETE /strings/:string_value`
-* **Description:** Deletes a string analysis from the database.
-* **Example URL:** `DELETE /strings/racecar`
-* **Success Response (204 No Content):**
-    Returns an empty body.
-* **Error Responses:**
-    * `404 Not Found`: If the string does not exist in the system.
+{
+  "error": "External data source unavailable",
+  "details": "Could not fetch data from RestCountries API"
+}
 
----
 
-## Testing
+GET /countries
 
-No formal testing framework (like Jest) is included in this build. The API endpoints should be tested manually using the documentation above and an API client like **Postman**.
+Retrieves a list of all countries from the database cache.
+
+Query Parameters:
+
+region (string): Filter by region (case-insensitive).
+
+Example: /api/countries?region=Africa
+
+currency (string): Filter by currency code (case-insensitive).
+
+Example: /api/countries?currency=NGN
+
+sort (string): Sorts the results.
+
+Example: /api/countries?sort=gdp_desc (Default is name_asc)
+
+Success Response (200):
+
+[
+  {
+    "id": 1,
+    "name": "Nigeria",
+    "capital": "Abuja",
+    "region": "Africa",
+    "population": 206139589,
+    "currency_code": "NGN",
+    "exchange_rate": 1600.23,
+    "estimated_gdp": 25767448125.2,
+    "flag_url": "[https://flagcdn.com/ng.svg](https://flagcdn.com/ng.svg)",
+    "last_refreshed_at": "2025-10-26T15:30:00.000Z"
+  }
+]
+
+
+GET /countries/:name
+
+Retrieves a single country by its name (case-insensitive).
+
+Success Response (200):
+
+{
+  "id": 1,
+  "name": "Nigeria",
+  /* ... all other fields */
+}
+
+
+Error Response (404):
+
+{ "error": "Country not found" }
+
+
+DELETE /countries/:name
+
+Deletes a single country from the database by its name (case-insensitive).
+
+Success Response (204): No content.
+
+Error Response (404):
+
+{ "error": "Country not found" }
+
+
+GET /status
+
+Shows the total number of countries in the database and the timestamp of the last successful refresh.
+
+Success Response (200):
+
+{
+  "id": 1,
+  "total_countries": 250,
+  "last_refreshed_at": "2025-10-26T15:30:00.000Z"
+}
+
+
+GET /countries/image
+
+Serves the summary.png image generated by the last successful refresh.
+
+Success Response (200): Returns the PNG image file.
+
+Error Response (404):
+
+{ "error": "Summary image not found" }
